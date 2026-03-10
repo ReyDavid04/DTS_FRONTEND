@@ -8,13 +8,14 @@ import {
   DtsTimePicker,
   DtsSelect,
   DtsDatePicker,
+  AlertService,
 } from '../../shared';
-import { departments, lines, reasons, shifts } from './data';
+
 import { classficationForm, downtimeForm, downtimeTotalForm, metricsForm } from './forms';
 import { IDowntimeClassification } from './models/downtime-classification.model';
 import { CommonModule } from '@angular/common';
 import { DowntimeState } from './state/downtime-state';
-import { DowntimeRequestService } from './services/downtime-request.service';
+import { DowntimeRequestService, ICreateDowntimeDto } from './services/downtime-request.service';
 import { GlobalStateService } from '../../core/application';
 
 @Component({
@@ -38,17 +39,17 @@ export class DowntimeRegister implements OnInit {
   private readonly downtimeRequestService = inject(DowntimeRequestService);
   private readonly downtimeState = inject(DowntimeState);
   private readonly globalState = inject(GlobalStateService);
+  private readonly alert = inject(AlertService);
 
   readonly shifts$ = this.downtimeState.shifts;
   readonly lines$ = this.downtimeState.lines;
-  readonly departments = departments;
+  readonly departments$ = this.downtimeState.departments;
+  readonly loadingSave$ = this.downtimeState.loadingSave;
 
   readonly downtimeForm = downtimeForm;
   readonly metricsForm = metricsForm;
   readonly downtimeTotalForm = downtimeTotalForm;
   readonly classficationForm = classficationForm;
-
-  readonly reasons = reasons;
 
   classifications: IDowntimeClassification[] = [];
 
@@ -198,13 +199,42 @@ export class DowntimeRegister implements OnInit {
 
   // ─── Actions ────────────────────────────────────────────────────────────────
 
-  registerDownTime(): void {
-    // console.log('downtimeForm:', this.downtimeForm.value);
-    // console.log('metricsForm:', this.metricsForm.value);
-    // console.log('STD:', this.standardOut);
-    // console.log('Eficiencia:', this.efficiency + '%');
-    // console.log('Tiempo muerto no reportado:', this.unreportedDowntime);
-    // console.log('Tiempo muerto generado:', this.generatedDowntime);
+  async registerDownTime(): Promise<void> {
+    // DtsInput stores every value as a string internally, so we must cast
+    // every numeric field explicitly to avoid @IsNumber() failures on the backend.
+    const toNum = (v: any): number | undefined => {
+      if (v === null || v === undefined || v === '') return undefined;
+      const n = Number(v);
+      return isNaN(n) ? undefined : n;
+    };
+
+    const dto: ICreateDowntimeDto = {
+      startTime: this.downtimeForm.controls.startTime.value,
+      endTime: this.downtimeForm.controls.endTime.value,
+      week: toNum(this.downtimeForm.controls.weekNumber.value),
+      shift: this.downtimeForm.controls.shift.value ?? undefined,
+      line: this.downtimeForm.controls.line.value ?? undefined,
+      stage: this.downtimeForm.controls.stage.value ?? undefined,
+      supervisor: this.downtimeForm.controls.supervisor.value?.toString(),
+      registeredBy: this.globalState.currentUser()?.username,
+      standardOutput: toNum(this.metricsForm.controls.standardOut.value),
+      currentOutput: toNum(this.metricsForm.controls.actualOut.value),
+      efficiency: this.efficiency,
+      downTimeGenerated: toNum(this.downtimeTotalForm.controls.generatedDowntime.value),
+      downTimeUnreported: toNum(this.downtimeTotalForm.controls.unreportedDowntime.value),
+      downTimeReported: toNum(this.downtimeTotalForm.controls.totalReportedDowntime.value),
+      classification: this.classifications.map((c) => ({
+        downTimeGenerated: Number(c.downtimeReported),
+        department: c.department,
+        reason: c.problemDescription ?? '',
+      })),
+    };
+
+    const success = await this.downtimeRequestService.createDowntime(dto);
+    if (success) {
+      this.alert.success('Registro guardado', 'El registro de tiempo muerto fue guardado exitosamente.');
+      this.resetForms();
+    }
   }
 
   addClassifyDowntime(): void {
@@ -234,11 +264,28 @@ export class DowntimeRegister implements OnInit {
   }
 
   getReasons(department: string): string[] {
-    const r = this.reasons as Record<string, string[]>;
-    return r[department] ?? r['AUTO'] ?? [];
+    const dept = this.departments$().find(d => d.department === department);
+    return dept?.reasons ?? [];
   }
 
   // ─── Private ────────────────────────────────────────────────────────────────
+
+  /** Limpia los formularios tras un guardado exitoso */
+  private resetForms(): void {
+    this.classifications = [];
+    const now = new Date();
+    now.setMinutes(0, 0, 0);
+    this.downtimeForm.controls.startTime.setValue(now);
+    this.downtimeForm.controls.line.setValue(null);
+    this.downtimeForm.controls.stage.setValue(null);
+    this.downtimeForm.controls.shift.setValue(null);
+    this.metricsForm.controls.actualOut.setValue(null);
+    this.metricsForm.controls.standardOut.setValue(0);
+    this.downtimeTotalForm.controls.totalReportedDowntime.setValue(0);
+    this.downtimeTotalForm.controls.generatedDowntime.setValue(0);
+    this.downtimeTotalForm.controls.unreportedDowntime.setValue(0);
+    this.classficationForm.reset();
+  }
 
   /** Retorna el número de semana ISO 8601 de la fecha dada (por defecto hoy) */
   private getWeekNumber(date: Date = new Date()): number {

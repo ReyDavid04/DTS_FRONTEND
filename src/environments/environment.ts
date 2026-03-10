@@ -15,10 +15,10 @@ export const environment = {
     BUSINESS_UNIT: "DT System",
 
     // ========= User environment ==================
-    userURL: "http://10.19.16.37:20024",
-    // userURL: "http://localhost:20024",
+    // userURL: "http://10.19.16.37:20024",
+    userURL: "http://localhost:20024",
     
     // ========= DTS environment ==================
-    dtsURL: "http://10.19.16.37:20026",
-    // dtsURL: "http://localhost:20026",
+    // dtsURL: "http://10.19.16.37:20026",
+    dtsURL: "http://localhost:20026",
 };

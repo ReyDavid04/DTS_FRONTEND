@@ -51,8 +51,16 @@ export class HttpErrorHandlerService {
       // Extrae el código de error desde el objeto recibido
       const errorCode = error.code?.toString( ).toLowerCase( ) || error.status?.toString( ) || '';
 
+      // Extract the backend's actual message from the response body (error.error)
+      // Angular's HttpErrorResponse puts the parsed JSON body in the `error` property.
+      // The NestJS exception filter returns: { statusCode, message, error, ... }
+      const backendMessage = error.error?.message;
+      const backendMessageStr = Array.isArray(backendMessage)
+        ? backendMessage.join(', ')
+        : backendMessage;
+
       // Determina el mensaje a mostrar al usuario
-      const message = error.msg?.message || error.message || ERROR_MESSAGES[errorCode] || ERROR_MESSAGES['default'];
+      const message = backendMessageStr || error.msg?.message || ERROR_MESSAGES[errorCode] || ERROR_MESSAGES['default'];
 
       // Muestra una alerta específica si el error es de autenticación
       if (message === 'Unauthorized' || error.status === 401) {

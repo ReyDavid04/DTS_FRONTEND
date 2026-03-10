@@ -55,6 +55,10 @@ export const routes: Routes = [
                 loadChildren: () => import('./features/reports/reports.routes').then(m => m.ReportsRoutes)
             },
             {
+                path: 'historial',
+                loadChildren: () => import('./features/historial/historial.routes').then(m => m.HistorialRoutes)
+            },
+            {
                 path: '',
                 redirectTo: 'home',
                 pathMatch: 'full'

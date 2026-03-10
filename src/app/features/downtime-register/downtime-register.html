@@ -12,7 +12,8 @@
             <dts-button
                 label="Guardar Registro"
                 icon="ri-save-outline"
-                [disabled]="!canSave"
+                [disabled]="!canSave || loadingSave$()"
+                [loading]="loadingSave$()"
                 (onClick)="registerDownTime()">
             </dts-button>
 
@@ -239,10 +240,10 @@
                         </dts-select>
 
                         <div class="col-span-2 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4 bg-slate-50 dark:bg-[#1f1f21] border border-slate-100 dark:border-[#343439] p-4 rounded-xl">
-                            @for (department of departments; track $index) {
+                            @for (dept of departments$(); track dept._id) {
                                 <label class="flex items-center gap-2 cursor-pointer group">
-                                    <input [formControl]="classficationForm.controls.department" [value]="department" class="rounded-full border-slate-300 text-primary focus:ring-primary" type="radio">
-                                    <span class="text-xs font-bold group-hover:text-primary transition-colors dark:text-[#b7b7b7]">{{ department }}</span>
+                                    <input [formControl]="classficationForm.controls.department" [value]="dept.department" class="rounded-full border-slate-300 text-primary focus:ring-primary" type="radio">
+                                    <span class="text-xs font-bold group-hover:text-primary transition-colors dark:text-[#b7b7b7]">{{ dept.department }}</span>
                                 </label>
                             }
                         </div>

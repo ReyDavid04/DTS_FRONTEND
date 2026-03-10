@@ -1,6 +1,6 @@
-<section class="w-full h-full flex flex-col gap-y-2 p-2 overflow-y-auto">
+﻿<section class="w-full h-full flex flex-col gap-y-2 p-2 overflow-y-auto">
 
-    <!-- ── Stat Cards ──────────────────────────────────────────────────────── -->
+    <!-- â”€â”€ Stat Cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
     <div class="grid grid-cols-4 gap-2">
 
         <!-- Total Downtime -->
@@ -12,18 +12,18 @@
                 </div>
             </div>
             <div class="flex items-baseline gap-2">
-                <span class="text-3xl font-bold text-slate-900 dark:text-slate-100">14h 22m</span>
+                <span class="text-3xl font-bold text-slate-900 dark:text-slate-100">{{ totalFormatted() }}</span>
                 <span class="text-sm font-semibold text-red-500">-12% vs LW</span>
             </div>
             <div class="h-1.5 w-full rounded-full bg-slate-100 dark:bg-[#3d3d3d] overflow-hidden">
-                <div class="h-full rounded-full bg-red-500" style="width: 60%"></div>
+                <div class="h-full rounded-full bg-red-500" [style.width]="totalPct() + `%`"></div>
             </div>
         </div>
 
         <!-- MTBF -->
         <div class="bg-white dark:bg-[#27272a] border border-slate-200 dark:border-[#3d3d3d] rounded-xl p-4 shadow-sm flex flex-col gap-3">
             <div class="flex items-center justify-between">
-                <span class="text-xs font-semibold text-slate-500 dark:text-[#b9b9b9] uppercase tracking-wide leading-tight">MTBF — Tiempo medio entre fallos</span>
+                <span class="text-xs font-semibold text-slate-500 dark:text-[#b9b9b9] uppercase tracking-wide leading-tight">MTBF â€” Tiempo medio entre fallos</span>
                 <div class="size-8 shrink-0 rounded-lg bg-blue-100 dark:bg-blue-900/20 text-blue-500 flex items-center justify-center">
                     <i class="ri-equalizer-2-line text-base"></i>
                 </div>
@@ -41,7 +41,7 @@
         <!-- MTTR -->
         <div class="bg-white dark:bg-[#27272a] border border-slate-200 dark:border-[#3d3d3d] rounded-xl p-4 shadow-sm flex flex-col gap-3">
             <div class="flex items-center justify-between">
-                <span class="text-xs font-semibold text-slate-500 dark:text-[#b9b9b9] uppercase tracking-wide leading-tight">MTTR — Tiempo medio de reparación</span>
+                <span class="text-xs font-semibold text-slate-500 dark:text-[#b9b9b9] uppercase tracking-wide leading-tight">MTTR â€” Tiempo medio de reparaciÃ³n</span>
                 <div class="size-8 shrink-0 rounded-lg bg-emerald-100 dark:bg-emerald-900/20 text-emerald-500 flex items-center justify-center">
                     <i class="ri-tools-line text-base"></i>
                 </div>
@@ -75,20 +75,20 @@
 
     </div>
 
-    <!-- ── Middle Row: Pareto + Donut ──────────────────────────────────────── -->
+    <!-- â”€â”€ Middle Row: Pareto + Donut â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
     <div class="grid grid-cols-5 gap-2">
 
         <!-- Pareto Chart -->
         <div class="col-span-3 bg-white dark:bg-[#27272a] border border-slate-200 dark:border-[#3d3d3d] rounded-xl p-4 shadow-sm flex flex-col gap-2">
             <div class="flex items-center justify-between">
                 <div>
-                    <h2 class="text-sm font-bold text-slate-900 dark:text-slate-100">Causas de tiempo muerto (Análisis de Pareto)</h2>
+                    <h2 class="text-sm font-bold text-slate-900 dark:text-slate-100">Causas de tiempo muerto (AnÃ¡lisis de Pareto)</h2>
                     <p class="text-xs text-slate-500 dark:text-[#b9b9b9]">Principales causas clasificadas por minutos totales de tiempo muerto</p>
                 </div>
                 <div class="flex items-center gap-3">
                     <div class="flex items-center gap-1.5">
                         <span class="size-2.5 rounded-sm bg-[#3a57e8]"></span>
-                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-[#b9b9b9]">Duración</span>
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-[#b9b9b9]">DuraciÃ³n</span>
                     </div>
                     <div class="flex items-center gap-1.5">
                         <span class="size-2.5 rounded-sm bg-[#f97316]"></span>
@@ -97,46 +97,46 @@
                 </div>
             </div>
             <apx-chart
-                [series]="paretoOptions.series"
-                [chart]="paretoOptions.chart"
-                [plotOptions]="paretoOptions.plotOptions"
-                [colors]="paretoOptions.colors"
-                [dataLabels]="paretoOptions.dataLabels"
-                [stroke]="paretoOptions.stroke"
-                [xaxis]="paretoOptions.xaxis"
-                [yaxis]="paretoOptions.yaxis"
-                [grid]="paretoOptions.grid"
-                [legend]="paretoOptions.legend"
-                [fill]="paretoOptions.fill"
-                [tooltip]="paretoOptions.tooltip"
-                [theme]="paretoOptions.theme">
+                [series]="paretoOptions().series"
+                [chart]="paretoOptions().chart"
+                [plotOptions]="paretoOptions().plotOptions"
+                [colors]="paretoOptions().colors"
+                [dataLabels]="paretoOptions().dataLabels"
+                [stroke]="paretoOptions().stroke"
+                [xaxis]="paretoOptions().xaxis"
+                [yaxis]="paretoOptions().yaxis"
+                [grid]="paretoOptions().grid"
+                [legend]="paretoOptions().legend"
+                [fill]="paretoOptions().fill"
+                [tooltip]="paretoOptions().tooltip"
+                [theme]="paretoOptions().theme">
             </apx-chart>
         </div>
 
         <!-- Distribution by Department -->
         <div class="col-span-2 bg-white dark:bg-[#27272a] border border-slate-200 dark:border-[#3d3d3d] rounded-xl p-4 shadow-sm flex flex-col gap-2">
             <div>
-                <h2 class="text-sm font-bold text-slate-900 dark:text-slate-100">Distribución por Departamento</h2>
-                <p class="text-xs text-slate-500 dark:text-[#b9b9b9]">Participación del tiempo muerto por departamento</p>
+                <h2 class="text-sm font-bold text-slate-900 dark:text-slate-100">DistribuciÃ³n por Departamento</h2>
+                <p class="text-xs text-slate-500 dark:text-[#b9b9b9]">ParticipaciÃ³n del tiempo muerto por departamento</p>
             </div>
 
             <div class="flex flex-col items-center gap-1">
                 <apx-chart
-                    [series]="donutOptions.series"
-                    [chart]="donutOptions.chart"
-                    [colors]="donutOptions.colors"
-                    [labels]="donutOptions.labels"
-                    [plotOptions]="donutOptions.plotOptions"
-                    [dataLabels]="donutOptions.dataLabels"
-                    [legend]="donutOptions.legend"
-                    [stroke]="donutOptions.stroke"
-                    [tooltip]="donutOptions.tooltip"
-                    [theme]="donutOptions.theme">
+                    [series]="donutOptions().series"
+                    [chart]="donutOptions().chart"
+                    [colors]="donutOptions().colors"
+                    [labels]="donutOptions().labels"
+                    [plotOptions]="donutOptions().plotOptions"
+                    [dataLabels]="donutOptions().dataLabels"
+                    [legend]="donutOptions().legend"
+                    [stroke]="donutOptions().stroke"
+                    [tooltip]="donutOptions().tooltip"
+                    [theme]="donutOptions().theme">
                 </apx-chart>
 
                 <!-- Leyenda -->
                 <div class="w-full flex flex-col gap-1.5 px-2">
-                    @for (dept of departments; track dept.name) {
+                    @for (dept of departments(); track dept.name) {
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-2">
                                 <span class="size-2.5 rounded-full" [style.background-color]="dept.color"></span>
@@ -151,15 +151,15 @@
 
     </div>
 
-    <!-- ── Bottom Row: Heatmap + Weekly Trend ──────────────────────────────── -->
+    <!-- â”€â”€ Bottom Row: Heatmap + Weekly Trend â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
     <div class="grid grid-cols-2 gap-2">
 
         <!-- Heatmap -->
         <div class="bg-white dark:bg-[#27272a] border border-slate-200 dark:border-[#3d3d3d] rounded-xl p-4 shadow-sm flex flex-col gap-2">
             <div class="flex items-center justify-between">
                 <div>
-                    <h2 class="text-sm font-bold text-slate-900 dark:text-slate-100">Mapa de Intensidad de Tiempo Muerto (24h × 7d)</h2>
-                    <p class="text-xs text-slate-500 dark:text-[#b9b9b9]">Intensidad de los eventos de tiempo muerto por hora y día</p>
+                    <h2 class="text-sm font-bold text-slate-900 dark:text-slate-100">Mapa de Intensidad de Tiempo Muerto (24h Ã— 7d)</h2>
+                    <p class="text-xs text-slate-500 dark:text-[#b9b9b9]">Intensidad de los eventos de tiempo muerto por hora y dÃ­a</p>
                 </div>
                 <div class="flex items-center gap-2 text-[10px] text-slate-500 dark:text-[#b9b9b9]">
                     <span>Bajo</span>
@@ -172,16 +172,16 @@
                 </div>
             </div>
             <apx-chart
-                [series]="heatmapOptions.series"
-                [chart]="heatmapOptions.chart"
-                [dataLabels]="heatmapOptions.dataLabels"
-                [colors]="heatmapOptions.colors"
-                [xaxis]="heatmapOptions.xaxis"
-                [yaxis]="heatmapOptions.yaxis"
-                [grid]="heatmapOptions.grid"
-                [tooltip]="heatmapOptions.tooltip"
-                [theme]="heatmapOptions.theme"
-                [plotOptions]="heatmapOptions.plotOptions">
+                [series]="heatmapOptions().series"
+                [chart]="heatmapOptions().chart"
+                [dataLabels]="heatmapOptions().dataLabels"
+                [colors]="heatmapOptions().colors"
+                [xaxis]="heatmapOptions().xaxis"
+                [yaxis]="heatmapOptions().yaxis"
+                [grid]="heatmapOptions().grid"
+                [tooltip]="heatmapOptions().tooltip"
+                [theme]="heatmapOptions().theme"
+                [plotOptions]="heatmapOptions().plotOptions">
             </apx-chart>
         </div>
 
@@ -190,7 +190,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <h2 class="text-sm font-bold text-slate-900 dark:text-slate-100">Tendencia Semanal de Tiempo Muerto</h2>
-                    <p class="text-xs text-slate-500 dark:text-[#b9b9b9]">Tiempo muerto reportado vs no reportado por día</p>
+                    <p class="text-xs text-slate-500 dark:text-[#b9b9b9]">Tiempo muerto reportado vs no reportado por dÃ­a</p>
                 </div>
                 <div class="flex items-center gap-3">
                     <div class="flex items-center gap-1.5">
@@ -204,21 +204,22 @@
                 </div>
             </div>
             <apx-chart
-                [series]="trendOptions.series"
-                [chart]="trendOptions.chart"
-                [colors]="trendOptions.colors"
-                [fill]="trendOptions.fill"
-                [stroke]="trendOptions.stroke"
-                [dataLabels]="trendOptions.dataLabels"
-                [xaxis]="trendOptions.xaxis"
-                [yaxis]="trendOptions.yaxis"
-                [grid]="trendOptions.grid"
-                [legend]="trendOptions.legend"
-                [tooltip]="trendOptions.tooltip"
-                [theme]="trendOptions.theme">
+                [series]="trendOptions().series"
+                [chart]="trendOptions().chart"
+                [colors]="trendOptions().colors"
+                [fill]="trendOptions().fill"
+                [stroke]="trendOptions().stroke"
+                [dataLabels]="trendOptions().dataLabels"
+                [xaxis]="trendOptions().xaxis"
+                [yaxis]="trendOptions().yaxis"
+                [grid]="trendOptions().grid"
+                [legend]="trendOptions().legend"
+                [tooltip]="trendOptions().tooltip"
+                [theme]="trendOptions().theme">
             </apx-chart>
         </div>
 
     </div>
 
 </section>
+

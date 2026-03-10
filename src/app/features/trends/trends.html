@@ -10,8 +10,8 @@
 
       <!-- Filters -->
       <div class="flex items-end gap-x-3 flex-wrap gap-y-2">
-        <dts-select label="Línea"      [control]="lineControl" optionValue="_id" optionLabel="name" [options]="lines"></dts-select>
-        <dts-select label="Departamento" [control]="deptControl" optionValue="_id" optionLabel="name" [options]="depts"></dts-select>
+        <dts-select label="Línea"      [control]="lineControl" optionValue="_id" optionLabel="name" [options]="lines()"></dts-select>
+        <dts-select label="Departamento" [control]="deptControl" optionValue="_id" optionLabel="name" [options]="depts()"></dts-select>
         <dts-button label="Aplicar" icon="ri-filter-3-line" (onClick)="applyFilter()"></dts-button>
       </div>
     </div>
@@ -25,7 +25,7 @@
       <div class="flex flex-col gap-y-1">
         <span class="text-xs font-semibold uppercase tracking-widest text-dts-badges">DT Semana Actual</span>
         <div class="flex items-end gap-x-2 mt-1">
-          <span class="text-3xl font-bold text-dts-title">{{ currentWeekDt }}</span>
+          <span class="text-3xl font-bold text-dts-title">{{ currentWeekDt() }}</span>
           <span class="text-sm text-dts-badges mb-1">min</span>
         </div>
         <div class="flex items-center gap-x-1 text-xs" [class.text-red-500]="kpiTrend().up" [class.text-green-500]="!kpiTrend().up">
@@ -43,7 +43,7 @@
           <i class="ri-ai-generate text-sm text-[#006699]"></i>
         </div>
         <div class="flex items-end gap-x-2 mt-1">
-          <span class="text-3xl font-bold text-[#006699]">{{ predictedNextDt }}</span>
+          <span class="text-3xl font-bold text-[#006699]">{{ predictedNextDt() }}</span>
           <span class="text-sm text-dts-badges mb-1">min</span>
         </div>
         <div class="flex items-center gap-x-1 text-xs text-green-500">
@@ -58,11 +58,11 @@
       <div class="flex flex-col gap-y-1">
         <span class="text-xs font-semibold uppercase tracking-widest text-dts-badges">Causa Principal Predicha</span>
         <div class="mt-1">
-          <span class="text-lg font-bold text-dts-title">Espera de Soporte</span>
+          <span class="text-lg font-bold text-dts-title">{{ causeTrends().length ? causeTrends()[0].cause : "Sin datos" }}</span>
         </div>
         <div class="flex items-center gap-x-2 mt-1">
-          <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">AUTO</span>
-          <span class="text-xs text-red-500 font-semibold">~190 min predichos</span>
+          <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">{{ causeTrends().length ? causeTrends()[0].dept : "" }}</span>
+          <span class="text-xs text-red-500 font-semibold">~{{ causeTrends().length ? causeTrends()[0].predicted : 0 }} min predichos</span>
         </div>
       </div>
     </dts-card>
@@ -100,7 +100,7 @@
       </div>
 
       <div class="flex flex-col gap-y-3">
-        @for (week of weeklyData; track week.label) {
+        @for (week of weeklyData(); track week.label) {
           <div class="flex items-center gap-x-3">
             <!-- Label -->
             <span class="w-16 text-xs font-medium text-right shrink-0"
@@ -136,7 +136,7 @@
       <span class="font-bold text-dts-title block mb-4">Top Causas — Análisis de Tendencia</span>
 
       <div class="flex flex-col gap-y-2">
-        @for (c of causeTrends; track c.cause) {
+        @for (c of causeTrends(); track c.cause) {
           <div class="flex items-center gap-x-3 px-3 py-2.5 rounded-lg border
             dark:border-[#3f3f46] hover:border-[#006699]/30 transition-colors">
 
@@ -186,7 +186,7 @@
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-      @for (insight of insights; track insight.title) {
+      @for (insight of insights(); track insight.title) {
         <div class="flex gap-x-3 p-3.5 rounded-xl border {{ insightBg[insight.type] }}"
           [ngClass]="insightBg[insight.type]">
           <div class="shrink-0 mt-0.5">

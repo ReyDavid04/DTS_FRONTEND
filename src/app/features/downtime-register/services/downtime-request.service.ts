@@ -7,6 +7,25 @@ import { DowntimeState } from '../state/downtime-state';
 import { IDepartment } from '../interfaces/department.interface';
 import { ILine } from '../interfaces/line.interface';
 import { IShift } from '../interfaces/shift.interface';
+import { IDowntimeRecord } from '../../../core/domain/interfaces/downtime-record.interface';
+
+export interface ICreateDowntimeDto {
+  startTime: Date;
+  endTime: Date;
+  week?: number;
+  shift?: string;
+  line?: string;
+  stage?: string;
+  supervisor?: string;
+  registeredBy?: string;
+  standardOutput?: number;
+  currentOutput?: number;
+  efficiency?: number;
+  downTimeGenerated?: number;
+  downTimeUnreported?: number;
+  downTimeReported?: number;
+  classification?: { downTimeGenerated: number; department: string; reason: string }[];
+}
 
 @Injectable({
   providedIn: 'root',
@@ -77,6 +96,21 @@ export class DowntimeRequestService {
           this.alert.error('Error al obtener los turnos');
         },
       });
+  }
+
+  createDowntime(dto: ICreateDowntimeDto): Promise<boolean> {
+    this.downtimeState.loadingSave.set(true);
+    return new Promise((resolve) => {
+      this.http
+        .post<IDowntimeRecord>(`${this.dtsURL}/v1/down-time`, dto)
+        .pipe(finalize(() => this.downtimeState.loadingSave.set(false)))
+        .subscribe({
+          next: () => resolve(true),
+          // HttpErrorHandlerService already shows an alert dialog before rethrowing;
+          // resolve(false) so the component knows it failed without a second dialog.
+          error: () => resolve(false),
+        });
+    });
   }
 
 }

@@ -1,29 +1,15 @@
-import { Component, computed, signal } from '@angular/core';
+﻿import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { DtsCard, DtsButton, DtsSelect, DtsDatePicker } from '../../shared';
+import { TrendsState } from './state/trends-state';
+import { TrendsRequestService } from './services/trends-request.service';
+import { DowntimeState } from '../downtime-register/state/downtime-state';
+import { IDowntimeRecord } from '../../core/domain/interfaces/downtime-record.interface';
 
-export interface WeekData {
-  label: string;
-  dt: number;       // minutos de downtime
-  predicted: boolean;
-}
-
-export interface CauseTrend {
-  cause: string;
-  dept: string;
-  currentWeek: number;
-  prevWeek: number;
-  trend: 'up' | 'down' | 'stable';
-  predicted: number;
-}
-
-export interface Insight {
-  type: 'warning' | 'success' | 'info';
-  icon: string;
-  title: string;
-  description: string;
-}
+export interface WeekData  { label: string; dt: number; predicted: boolean; }
+export interface CauseTrend { cause: string; dept: string; currentWeek: number; prevWeek: number; trend: 'up' | 'down' | 'stable'; predicted: number; }
+export interface Insight    { type: 'warning' | 'success' | 'info'; icon: string; title: string; description: string; }
 
 @Component({
   selector: 'dts-trends',
@@ -32,92 +18,169 @@ export interface Insight {
   templateUrl: './trends.html',
   styles: ``,
 })
-export class Trends {
+export class Trends implements OnInit {
+  private readonly trendsState = inject(TrendsState);
+  private readonly trendsReq   = inject(TrendsRequestService);
+  private readonly dtState     = inject(DowntimeState);
+
   lineControl  = new FormControl('Todas');
   deptControl  = new FormControl('Todos');
   startControl = new FormControl<Date | null>(null);
 
-  lines = [
-    { _id: 'Todas', name: 'Todas las líneas' },
-    { _id: 'SA2',   name: 'SA2' },
-    { _id: 'FA1',   name: 'FA1' },
-    { _id: 'FA2',   name: 'FA2' },
-  ];
-  depts = [
+  readonly loading = this.trendsState.loading;
+
+  //  Filter options from API 
+  readonly lines = computed(() => [
+    { _id: 'Todas', name: 'Todas las lineas' },
+    ...this.dtState.lines().map(l => ({ _id: l.name, name: l.name })),
+  ]);
+
+  readonly depts = computed(() => [
     { _id: 'Todos', name: 'Todos' },
-    { _id: 'AUTO',  name: 'AUTO'  },
-    { _id: 'DIAG',  name: 'DIAG'  },
-    { _id: 'MFG',   name: 'MFG'   },
-    { _id: 'PMC',   name: 'PMC'   },
-  ];
+    ...this.dtState.departments().map(d => ({ _id: d.department, name: d.department })),
+  ]);
 
-  weeklyData: WeekData[] = [
-    { label: 'Sem 44',  dt: 820,  predicted: false },
-    { label: 'Sem 45',  dt: 740,  predicted: false },
-    { label: 'Sem 46',  dt: 960,  predicted: false },
-    { label: 'Sem 47',  dt: 680,  predicted: false },
-    { label: 'Sem 48',  dt: 590,  predicted: false },
-    { label: 'Sem 49',  dt: 630,  predicted: false }, // current week
-    { label: 'Sem 50*', dt: 550,  predicted: true  }, // predicted
-    { label: 'Sem 51*', dt: 490,  predicted: true  }, // predicted
-  ];
+  //  Helper: current ISO week 
+  private currentWeek(): number {
+    const d = new Date();
+    const utc = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const day = utc.getUTCDay() || 7;
+    utc.setUTCDate(utc.getUTCDate() + 4 - day);
+    const y1 = new Date(Date.UTC(utc.getUTCFullYear(), 0, 1));
+    return Math.ceil(((utc.getTime() - y1.getTime()) / 86_400_000 + 1) / 7);
+  }
 
-  maxDt = computed(() => Math.max(...this.weeklyData.map(w => w.dt)));
+  //  Weekly bar chart data 
+  readonly weeklyData = computed<WeekData[]>(() => {
+    const records = this.trendsState.records();
+    const weekMap = new Map<number, number>();
+    for (const r of records) {
+      weekMap.set(r.week, (weekMap.get(r.week) ?? 0) + (r.downTimeGenerated ?? 0));
+    }
+    const weeks = [...weekMap.entries()].sort((a, b) => a[0] - b[0]);
+    return weeks.map(([w, dt]) => ({ label: `Sem ${w}`, dt: Math.round(dt), predicted: false }));
+  });
+
+  readonly maxDt = computed(() => {
+    const data = this.weeklyData();
+    return data.length ? Math.max(...data.map(w => w.dt)) : 1;
+  });
 
   barWidth(dt: number): number {
     return Math.round((dt / this.maxDt()) * 100);
   }
 
-  // KPI computed values
-  currentWeekDt  = 630;  // minutes
-  predictedNextDt = 550;
-  prevWeekDt     = 590;
+  //  KPI values 
+  readonly currentWeekDt = computed(() => {
+    const cw = this.currentWeek();
+    return this.weeklyData().find(w => w.label === `Sem ${cw}`)?.dt ?? 0;
+  });
 
-  kpiTrend = computed(() => {
-    const delta = ((this.currentWeekDt - this.prevWeekDt) / this.prevWeekDt) * 100;
+  readonly prevWeekDt = computed(() => {
+    const cw = this.currentWeek();
+    return this.weeklyData().find(w => w.label === `Sem ${cw - 1}`)?.dt ?? 0;
+  });
+
+  /** Simple linear prediction: current_week + (current - prev) */
+  readonly predictedNextDt = computed(() => {
+    const curr = this.currentWeekDt();
+    const prev = this.prevWeekDt();
+    const predicted = curr + (curr - prev);
+    return predicted > 0 ? predicted : 0;
+  });
+
+  readonly kpiTrend = computed(() => {
+    const curr = this.currentWeekDt();
+    const prev = this.prevWeekDt();
+    if (prev === 0) return { value: '0.0', up: false };
+    const delta = ((curr - prev) / prev) * 100;
     return { value: Math.abs(delta).toFixed(1), up: delta > 0 };
   });
 
-  expectedReduction = computed(() => {
-    const r = ((this.currentWeekDt - this.predictedNextDt) / this.currentWeekDt) * 100;
+  readonly expectedReduction = computed(() => {
+    const curr = this.currentWeekDt();
+    const next = this.predictedNextDt();
+    if (curr === 0) return '0.0';
+    const r = ((curr - next) / curr) * 100;
     return r.toFixed(1);
   });
 
-  // Top cause trends
-  causeTrends: CauseTrend[] = [
-    { cause: 'Espera de Soporte',  dept: 'AUTO', currentWeek: 210, prevWeek: 180, trend: 'up',     predicted: 190 },
-    { cause: 'Paro por Diag',      dept: 'DIAG', currentWeek: 140, prevWeek: 155, trend: 'down',   predicted: 125 },
-    { cause: 'Espera de Surtido',  dept: 'PMC',  currentWeek: 110, prevWeek: 108, trend: 'stable', predicted: 105 },
-    { cause: 'Falla de Equipo',    dept: 'MFG',  currentWeek: 95,  prevWeek: 130, trend: 'down',   predicted: 75  },
-    { cause: 'Setup Excesivo',     dept: 'AUTO', currentWeek: 75,  prevWeek: 60,  trend: 'up',     predicted: 55  },
-  ];
+  //  Cause trends (compare current vs previous week by dept+reason) 
+  readonly causeTrends = computed<CauseTrend[]>(() => {
+    const records = this.trendsState.records();
+    const cw = this.currentWeek();
 
-  insights: Insight[] = [
-    {
-      type: 'warning',
-      icon: 'ri-alarm-warning-line',
-      title: 'AUTO — Espera de Soporte en aumento',
-      description: 'Esta causa subió 16.7% vs. semana anterior. Sin intervención se proyecta alcanzar 215 min/sem en Sem 51.'
-    },
-    {
-      type: 'success',
-      icon: 'ri-trending-down-line',
-      title: 'DIAG — Paro por Diag con tendencia positiva',
-      description: 'Reducción sostenida por 2 semanas consecutivas. Se predice finalizar bajo 125 min/sem la próxima semana.'
-    },
-    {
-      type: 'info',
-      icon: 'ri-lightbulb-line',
-      title: 'Ventana óptima detectada: Sem 50',
-      description: 'El modelo predice el menor tiempo muerto acumulado de las últimas 8 semanas. Oportunidad para preventivos.'
-    },
-    {
-      type: 'warning',
-      icon: 'ri-user-settings-line',
-      title: 'Setup Excesivo — patrón recurrente lunes AM',
-      description: 'El 78% de los eventos ocurren entre 6:00 y 8:00 del lunes. Revisar procedimiento de arranque de semana.'
-    },
-  ];
+    const currRecords = records.filter(r => r.week === cw);
+    const prevRecords = records.filter(r => r.week === cw - 1);
+
+    const aggregate = (recs: IDowntimeRecord[]): Map<string, { dept: string; total: number }> => {
+      const m = new Map<string, { dept: string; total: number }>();
+      for (const r of recs) {
+        for (const c of r.classification ?? []) {
+          const key = `${c.department}|${c.reason}`;
+          const existing = m.get(key);
+          if (existing) existing.total += c.downTimeGenerated ?? 0;
+          else m.set(key, { dept: c.department, total: c.downTimeGenerated ?? 0 });
+        }
+      }
+      return m;
+    };
+
+    const currMap = aggregate(currRecords);
+    const prevMap = aggregate(prevRecords);
+
+    const allKeys = new Set([...currMap.keys(), ...prevMap.keys()]);
+    const trends: CauseTrend[] = [];
+
+    for (const key of allKeys) {
+      const [dept, cause] = key.split('|');
+      const curr = Math.round(currMap.get(key)?.total ?? 0);
+      const prev = Math.round(prevMap.get(key)?.total ?? 0);
+      const delta = curr - prev;
+      const trend: 'up' | 'down' | 'stable' = delta > 5 ? 'up' : delta < -5 ? 'down' : 'stable';
+      const predicted = Math.max(0, Math.round(curr + delta * 0.7));
+      trends.push({ cause, dept, currentWeek: curr, prevWeek: prev, trend, predicted });
+    }
+
+    return trends.sort((a, b) => b.currentWeek - a.currentWeek).slice(0, 8);
+  });
+
+  //  Auto-generated insights 
+  readonly insights = computed<Insight[]>(() => {
+    const trends = this.causeTrends();
+    const result: Insight[] = [];
+
+    const topUp   = trends.filter(t => t.trend === 'up').sort((a, b) => (b.currentWeek - b.prevWeek) - (a.currentWeek - a.prevWeek))[0];
+    const topDown = trends.filter(t => t.trend === 'down').sort((a, b) => (a.currentWeek - a.prevWeek) - (b.currentWeek - b.prevWeek))[0];
+
+    if (topUp) {
+      const pct = topUp.prevWeek > 0 ? ((topUp.currentWeek - topUp.prevWeek) / topUp.prevWeek * 100).toFixed(1) : '--';
+      result.push({
+        type: 'warning', icon: 'ri-alarm-warning-line',
+        title: `${topUp.dept}  ${topUp.cause} en aumento`,
+        description: `Esta causa subio ${pct}% vs. semana anterior. Se proyecta ${topUp.predicted} min la proxima semana.`,
+      });
+    }
+    if (topDown) {
+      result.push({
+        type: 'success', icon: 'ri-trending-down-line',
+        title: `${topDown.dept}  ${topDown.cause} con tendencia positiva`,
+        description: `Reduccion: ${topDown.prevWeek}  ${topDown.currentWeek} min. Proyeccion proxima semana: ${topDown.predicted} min.`,
+      });
+    }
+    const totalCurr = trends.reduce((s, t) => s + t.currentWeek, 0);
+    const totalPrev = trends.reduce((s, t) => s + t.prevWeek, 0);
+    if (totalCurr > 0 && totalPrev > 0) {
+      const pct = ((totalCurr - totalPrev) / totalPrev * 100).toFixed(1);
+      result.push({
+        type: 'info', icon: 'ri-bar-chart-grouped-line',
+        title: 'Resumen semanal de tiempo muerto',
+        description: `Total esta semana: ${totalCurr} min vs ${totalPrev} min semana anterior (${pct > '0' ? '+' : ''}${pct}%).`,
+      });
+    }
+
+    return result;
+  });
 
   insightBg: Record<string, string> = {
     warning: 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800/40',
@@ -130,5 +193,9 @@ export class Trends {
     info:    'text-blue-500',
   };
 
-  applyFilter(): void { console.log('Apply filter'); }
+  applyFilter(): void { this.trendsReq.loadAll(); }
+
+  ngOnInit(): void {
+    this.trendsReq.loadAll();
+  }
 }
