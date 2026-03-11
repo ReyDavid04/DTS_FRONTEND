@@ -5,20 +5,20 @@ import { DtsCard, DtsButton, DtsSelect, DtsDatePicker } from '../../shared';
 import { ReportsState } from './state/reports-state';
 import { ReportsRequestService } from './services/reports-request.service';
 import { DowntimeState } from '../downtime-register/state/downtime-state';
-import { IDowntimeRecord } from '../../core/domain/interfaces/downtime-record.interface';
 
 export interface HourRow {
   hour: string;
   standard: number;
   production: number;
   efficiency: number;
-  mfgTop: string | null;
-  mfgNr: string | null;
+  /** Downtime minutes per department: { 'TEST': 5, 'FACILITIES': 5, ... } */
+  depts: Record<string, number>;
   dtReported: string;
   realTime: string;
   dtGenerated: string;
   dtNotReported: string;
   isCurrentHour?: boolean;
+  hasRecord: boolean;
 }
 
 export interface ActionLogRow {
@@ -78,48 +78,146 @@ export class Reports implements OnInit {
     { _id: 'Cerrado', name: 'Cerrado' },
   ];
 
-  // ─── Helper: format minutes as HH:MM ──────────────────────────────────────
+  // ─── Helper: format minutes as plain integer ─────────────────────────────
   private fmtMin(min: number): string {
-    if (!min || min <= 0) return '0:00';
-    const h = Math.floor(min / 60);
-    const m = Math.round(min % 60);
-    return `${h}:${String(m).padStart(2, '0')}`;
+    if (!min || min <= 0) return '0';
+    return String(Math.round(min));
   }
 
-  // ─── Hourly rows from records ──────────────────────────────────────────────
-  readonly hourlyRows = computed<HourRow[]>(() => {
-    const records = this.reportsState.records();
-    return records.map((r: IDowntimeRecord): HourRow => {
-      const startDate = new Date(r.startTime);
-      const startH    = isNaN(startDate.getTime()) ? '?' : startDate.getHours();
-      const endDate   = new Date(r.endTime);
-      const endH      = isNaN(endDate.getTime()) ? '?' : endDate.getHours();
-      return {
-        hour:          `${startH}:00 - ${endH}:00`,
-        standard:      r.standardOutput        ?? 0,
-        production:    r.currentOutput         ?? 0,
-        efficiency:    +(r.efficiency          ?? 0).toFixed(2),
-        mfgTop:        null,
-        mfgNr:         null,
-        dtReported:    this.fmtMin(r.downTimeReported   ?? 0),
-        realTime:      this.fmtMin(r.downTimeReported   ?? 0),
-        dtGenerated:   this.fmtMin(r.downTimeGenerated  ?? 0),
-        dtNotReported: this.fmtMin(r.downTimeUnreported ?? 0),
-      };
+  // ─── Unique dept columns for the selected day ────────────────────────────
+  readonly deptColumns = computed<string[]>(() => {
+    const records      = this.reportsState.records();
+    const selectedDate = this.dateControl.value ? new Date(this.dateControl.value) : new Date();
+    const dayRecords   = records.filter(r => {
+      const d = new Date(r.startTime);
+      return !isNaN(d.getTime()) && d.toDateString() === selectedDate.toDateString();
     });
+    const seen = new Set<string>();
+    for (const r of dayRecords) {
+      for (const c of r.classification ?? []) {
+        if (c.department) seen.add(c.department);
+      }
+    }
+    return [...seen].sort();
+  });
+
+  // ─── Hourly rows: one row per hour 0..currentHour ─────────────────────────
+  readonly hourlyRows = computed<HourRow[]>(() => {
+    const records      = this.reportsState.records();
+    const lines        = this.dtState.lines();
+    const selectedDate = this.dateControl.value ? new Date(this.dateControl.value) : new Date();
+    const now          = new Date();
+    const isToday      = selectedDate.toDateString() === now.toDateString();
+
+    // Filter to the selected day
+    const dayRecords = records.filter(r => {
+      const d = new Date(r.startTime);
+      return !isNaN(d.getTime()) && d.toDateString() === selectedDate.toDateString();
+    });
+
+    // Render up to currentHour for today, full day (0-23) for past dates
+    const lastHour = isToday ? now.getHours() : 23;
+    const rows: HourRow[] = [];
+
+    for (let h = 0; h <= lastHour; h++) {
+      // Find the record that starts in this hour slot
+      const record = dayRecords.find(r => new Date(r.startTime).getHours() === h);
+
+      // ── STD from DB: line → stage → hourlyStandard matching hour h ──────
+      let stdDb = 0;
+      if (record) {
+        if (lines.length > 0 && record.line) {
+          const lineObj  = lines.find(l => l.name === record.line);
+          const stageObj = record.stage
+            ? lineObj?.stages.find(s => s.name === record.stage)
+            : lineObj?.stages[0];
+          const hs = stageObj?.hourlyStandards.find(
+            x => h >= x.startHour && h < x.endHour,
+          );
+          stdDb = hs?.standard ?? record.standardOutput ?? 0;
+        } else {
+          stdDb = record.standardOutput ?? 0;
+        }
+      }
+
+      const production   = record?.currentOutput     ?? 0;
+      const eff          = stdDb > 0 ? +(production / stdDb * 100).toFixed(2) : 0;
+      const dtGenerated  = record?.downTimeGenerated  ?? 0;
+      const dtReported   = record?.downTimeReported   ?? 0;
+      const dtUnreported = record?.downTimeUnreported ?? 0;
+
+      // Tiempo Real = 60 min period - DT Generado (actual productive minutes)
+      const realTimeMin  = Math.max(0, 60 - dtGenerated);
+
+      // Build dept minutes map for this hour
+      const depts: Record<string, number> = {};
+      if (record?.classification?.length) {
+        for (const c of record.classification) {
+          if (c.department) {
+            depts[c.department] = (depts[c.department] ?? 0) + (c.downTimeGenerated ?? 0);
+          }
+        }
+      }
+
+      rows.push({
+        hour:          `${h}:00 - ${h + 1}:00`,
+        standard:      stdDb,
+        production,
+        efficiency:    record ? eff : 0,
+        depts,
+        dtReported:    this.fmtMin(dtReported),
+        realTime:      record ? this.fmtMin(realTimeMin) : '—',
+        dtGenerated:   this.fmtMin(dtGenerated),
+        dtNotReported: this.fmtMin(dtUnreported),
+        isCurrentHour: isToday && h === now.getHours(),
+        hasRecord:     !!record,
+      });
+    }
+
+    return rows;
   });
 
   readonly totals = computed(() => {
-    const rows = this.hourlyRows();
-    if (!rows.length) return { standard: 0, production: 0, efficiency: 0, dtGenerated: '0:00', dtNotReported: '0:00' };
-    const totalDtGen = this.reportsState.records().reduce((s, r) => s + (r.downTimeGenerated  ?? 0), 0);
-    const totalDtNr  = this.reportsState.records().reduce((s, r) => s + (r.downTimeUnreported ?? 0), 0);
+    const rows = this.hourlyRows().filter(r => r.hasRecord);
+    if (!rows.length) return {
+      standard: 0, production: 0, efficiency: 0,
+      dtReported: '0', realTime: '0',
+      dtGenerated: '0', dtNotReported: '0',
+      deptTotals: {} as Record<string, number>,
+    };
+
+    // Raw minute sums from the filtered day records
+    const dayRecs = this.reportsState.records().filter(r => {
+      const d = new Date(r.startTime);
+      const sel = this.dateControl.value ? new Date(this.dateControl.value) : new Date();
+      return !isNaN(d.getTime()) && d.toDateString() === sel.toDateString();
+    });
+    const totDtGen = dayRecs.reduce((s, r) => s + (r.downTimeGenerated  ?? 0), 0);
+    const totDtNr  = dayRecs.reduce((s, r) => s + (r.downTimeUnreported ?? 0), 0);
+    const totDtRep = dayRecs.reduce((s, r) => s + (r.downTimeReported   ?? 0), 0);
+    const totReal  = dayRecs.reduce((s, r) => s + Math.max(0, 60 - (r.downTimeGenerated ?? 0)), 0);
+
+    const totalStd  = rows.reduce((s, r) => s + r.standard,   0);
+    const totalProd = rows.reduce((s, r) => s + r.production, 0);
+    const avgEff    = totalStd > 0 ? +(totalProd / totalStd * 100).toFixed(2) : 0;
+
+    // Sum dept minutes across all day rows
+    const deptTotals: Record<string, number> = {};
+    for (const r of rows) {
+      for (const [dept, min] of Object.entries(r.depts)) {
+        deptTotals[dept] = (deptTotals[dept] ?? 0) + min;
+      }
+    }
+
     return {
-      standard:      rows.reduce((s, r) => s + r.standard,   0),
-      production:    rows.reduce((s, r) => s + r.production, 0),
-      efficiency:    +(rows.reduce((s, r) => s + r.efficiency, 0) / rows.length).toFixed(2),
-      dtGenerated:   this.fmtMin(totalDtGen),
-      dtNotReported: this.fmtMin(totalDtNr),
+      standard:      totalStd,
+      production:    totalProd,
+      efficiency:    avgEff,
+      dtReported:    this.fmtMin(totDtRep),
+      realTime:      this.fmtMin(totReal),
+      dtGenerated:   this.fmtMin(totDtGen),
+      dtNotReported: this.fmtMin(totDtNr),
+      deptTotals,
     };
   });
 
@@ -171,7 +269,10 @@ export class Reports implements OnInit {
   });
 
   applyFilter(): void {
-    this.reportsReq.loadRecords({ line: this.lineControl.value ?? undefined });
+    this.reportsReq.loadRecords({
+      line: this.lineControl.value ?? undefined,
+      date: this.dateControl.value ?? new Date(),
+    });
   }
 
   setToday(): void {
@@ -184,6 +285,6 @@ export class Reports implements OnInit {
   exportToExcel(): void { console.log('Export to Excel'); }
 
   ngOnInit(): void {
-    this.reportsReq.loadRecords();
+    this.reportsReq.loadRecords({ date: new Date() });
   }
 }

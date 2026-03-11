@@ -65,10 +65,9 @@
               <th class="px-3 py-3 font-semibold">Estándar</th>
               <th class="px-3 py-3 font-semibold">Producción</th>
               <th class="px-3 py-3 font-semibold">Eficiencia</th>
-              <th class="px-3 py-3 font-semibold min-w-27.5">
-                <div>MFG</div>
-                <span class="text-[10px] font-normal bg-green-500 text-white px-1.5 py-0.5 rounded">Top 1</span>
-              </th>
+              @for (dept of deptColumns(); track dept) {
+                <th class="px-3 py-3 font-semibold uppercase tracking-wide">{{ dept }}</th>
+              }
               <th class="px-3 py-3 font-semibold">DT Reportado</th>
               <th class="px-3 py-3 font-semibold">Tiempo Real</th>
               <th class="px-3 py-3 font-semibold">DT Generado</th>
@@ -80,6 +79,7 @@
               <tr class="border-b dark:border-[#3f3f46] text-center text-sm transition-colors"
                 [class.bg-yellow-50]="row.isCurrentHour"
                 [class.dark:bg-yellow-900/10]="row.isCurrentHour"
+                [class.opacity-40]="!row.hasRecord && !row.isCurrentHour"
                 [class.hover:bg-gray-50]="!row.isCurrentHour"
                 [class.dark:hover:bg-[#2a2a2a]]="!row.isCurrentHour">
 
@@ -94,15 +94,13 @@
                   {{ row.efficiency | number:'1.2-2' }}%
                 </td>
 
-                <!-- MFG Top cell — light green bg when empty -->
-                <td class="px-3 py-2.5 text-xs"
-                  [class.bg-green-50]="!row.mfgTop"
-                  [class.dark:bg-green-900/10]="!row.mfgTop">
-                  @if (row.mfgTop) {
-                    <div class="font-mono">{{ row.mfgTop }}</div>
-                    <div class="text-red-500 font-semibold">{{ row.mfgNr }}</div>
-                  }
-                </td>
+                <!-- Dept columns — one per unique department -->
+                @for (dept of deptColumns(); track dept) {
+                  <td class="px-3 py-2.5 text-dts-badges font-semibold"
+                    [class.text-red-500]="(row.depts[dept] ?? 0) > 0">
+                    {{ row.depts[dept] ?? 0 }}
+                  </td>
+                }
 
                 <td class="px-3 py-2.5 text-dts-badges">{{ row.dtReported }}</td>
                 <td class="px-3 py-2.5 text-dts-badges">{{ row.realTime }}</td>
@@ -110,8 +108,8 @@
 
                 <!-- DT No Reportado — red if nonzero -->
                 <td class="px-3 py-2.5 font-semibold"
-                  [class.text-red-500]="row.dtNotReported !== '0:00'"
-                  [class.text-dts-badges]="row.dtNotReported === '0:00'">
+                  [class.text-red-500]="row.dtNotReported !== '0'"
+                  [class.text-dts-badges]="row.dtNotReported === '0'">
                   {{ row.dtNotReported }}
                 </td>
               </tr>
@@ -128,9 +126,11 @@
                 [class.text-red-500]="totals().efficiency < 100">
                 {{ totals().efficiency | number:'1.2-2' }}%
               </td>
-              <td class="px-3 py-3 text-dts-title">{{ totals().dtGenerated }}</td>
-              <td class="px-3 py-3 text-dts-badges">0:00</td>
-              <td class="px-3 py-3 text-dts-badges">0:00</td>
+              @for (dept of deptColumns(); track dept) {
+                <td class="px-3 py-3 text-red-500 font-bold">{{ totals().deptTotals[dept] ?? 0 }}</td>
+              }
+              <td class="px-3 py-3 text-dts-title">{{ totals().dtReported }}</td>
+              <td class="px-3 py-3 text-dts-title">{{ totals().realTime }}</td>
               <td class="px-3 py-3 text-dts-title">{{ totals().dtGenerated }}</td>
               <td class="px-3 py-3 text-red-500">{{ totals().dtNotReported }}</td>
             </tr>

@@ -15,11 +15,14 @@ export class ReportsRequestService {
   private readonly downtimeReq  = inject(DowntimeRequestService);
   private readonly dtsURL       = environment.dtsURL;
 
-  loadRecords(params: { line?: string; shift?: string; week?: number } = {}): void {
+  loadRecords(params: { line?: string; shift?: string; week?: number; date?: Date } = {}): void {
+    const targetDate = params.date ?? new Date();
+    const week       = params.week ?? this.getWeekNumber(targetDate);
+
     const query = new URLSearchParams({ limit: '500' });
+    query.set('week', String(week));
     if (params.line  && params.line  !== 'Todas') query.set('line',  params.line);
     if (params.shift && params.shift !== 'Todos') query.set('shift', params.shift);
-    if (params.week)                              query.set('week',  String(params.week));
 
     this.reportsState.loading.set(true);
     this.http
@@ -34,5 +37,14 @@ export class ReportsRequestService {
       });
     this.downtimeReq.getDepartments(false);
     this.downtimeReq.getLines(false);
+  }
+
+  /** ISO 8601 week number */
+  private getWeekNumber(date: Date): number {
+    const d      = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil(((d.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
   }
 }
